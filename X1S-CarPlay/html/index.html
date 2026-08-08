@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div id="app">
+
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+    <div class="deck">
+
+        <!-- Saved Songs -->
+        <div id="savedPanel" class="savedPanel">
+            <div class="queue-head">
+                <h2>Saved</h2>
+                <button id="saveCurrentBtn" onclick="saveCurrentSong()">Save Current</button>
+            </div>
+            <div class="import-actions">
+                <button id="openSaveLinkBtn" class="import-action-btn" onclick="openLinkModal('song')">
+                    <svg viewBox="0 0 24 24" width="15" height="15"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+                    <span>Save Song</span>
+                </button>
+                <button id="openPlaylistLinkBtn" class="import-action-btn" onclick="openLinkModal('playlist')">
+                    <svg viewBox="0 0 24 24" width="15" height="15"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+                    <span>Import Playlist</span>
+                </button>
+            </div>
+            <div id="savedList" class="gallery"></div>
+        </div>
+
+        <!-- Save Song / Import Playlist link entry - shared by both
+             buttons above, switched between the two modes in JS. -->
+        <div id="linkModalOverlay" class="link-modal-overlay" onclick="if (event.target === this) closeLinkModal();">
+            <div id="linkModal" class="link-modal">
+                <div class="link-modal-head">
+                    <h3 id="linkModalTitle">Save Song</h3>
+                    <button class="link-modal-close" onclick="closeLinkModal()" aria-label="Close">✕</button>
+                </div>
+                <input id="linkModalInput" class="link-modal-input" placeholder="Paste a YouTube link" autocomplete="off">
+                <div id="linkModalError" class="link-error"></div>
+                <button id="linkModalSubmit" class="link-modal-submit" onclick="submitLinkModal()">Save</button>
+            </div>
+        </div>
+
+        <!-- Vertical volume rail -->
+        <div id="volRail" class="vol-rail">
+            <button id="volUp" class="vol-btn" title="Volume up" aria-label="Volume up">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+            </button>
+
+            <div class="vol-meter" title="Volume">
+                <svg viewBox="0 0 24 24" width="18" height="18" id="volIcon">
+                    <path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor"/>
+                    <path id="volWave1" d="M16.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    <path id="volWave2" d="M19 6a9 9 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+                <div id="volPct">50%</div>
+            </div>
+
+            <button id="volDown" class="vol-btn" title="Volume down" aria-label="Volume down">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+            </button>
+        </div>
+
+        <!-- Main head unit -->
+        <div id="mainUI" class="carplay">
+
+            <div class="topbar">
+                <button class="close" onclick="closeUI()" aria-label="Close">✕</button>
+                <div id="menuTitle">X1Studios CarPlay</div>
+            </div>
+
+            <div class="panel-toggles">
+                <button id="toggleSavedBtn" class="panel-toggle-btn" onclick="toggleSavedPanel()" aria-pressed="false">
+                    <span>Saved</span>
+                    <span id="savedCount" class="badge">0</span>
+                </button>
+                <button id="toggleQueueBtn" class="panel-toggle-btn" onclick="toggleQueuePanel()" aria-pressed="false">
+                    <span>Queue</span>
+                    <span id="queueCount" class="badge">0</span>
+                </button>
+            </div>
+
+            <div class="art-wrap">
+                <img id="album" alt="">
+                <div id="artPlaceholder" class="art-placeholder">
+                    <svg viewBox="0 0 24 24" width="34" height="34"><path d="M9 18V5l12-2v13" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="1.6" fill="none"/><circle cx="18" cy="16" r="3" stroke="currentColor" stroke-width="1.6" fill="none"/></svg>
+                </div>
+            </div>
+
+            <div class="info">
+                <div id="title">Nothing Playing</div>
+                <div id="artist">Paste a link below to get started</div>
+            </div>
+
+            <div class="progress" id="progressTrack">
+                <div id="bar"><div class="scrub-handle"></div></div>
+            </div>
+            <div class="time-row">
+                <span id="timeCur">0:00</span>
+                <span id="timeDur">0:00</span>
+            </div>
+
+            <div class="controls">
+                <button id="restartbtn" class="ctrl-btn icon-btn" onclick="restart()" aria-label="Restart song">
+                    <svg viewBox="0 0 24 24" width="18" height="18"><rect x="4" y="5" width="3" height="14" fill="currentColor"/><path d="M19 5v14L9 12 19 5z" fill="currentColor"/></svg>
+                </button>
+
+                <button id="playpause" class="ctrl-btn" onclick="toggle()" aria-label="Play or pause">▶</button>
+
+                <button id="skipbtn" class="ctrl-btn icon-btn" onclick="skip()" aria-label="Skip">
+                    <svg viewBox="0 0 24 24" width="18" height="18"><path d="M5 5v14l10-7L5 5z" fill="currentColor"/><rect x="17" y="5" width="3" height="14" fill="currentColor"/></svg>
+                </button>
+            </div>
+
+            <div class="link-row">
+                <input id="link" placeholder="Paste a YouTube link" autocomplete="off">
+            </div>
+            <div class="link-actions">
+                <button id="playbtn" onclick="submitPlay()">Play</button>
+                <button id="queuebtn" onclick="submitQueue()">Add to Queue</button>
+            </div>
+            <div id="linkError" class="link-error"></div>
+
+            <!-- Shortcuts to Save Current and Start Queue - lets you save
+                 the current song or kick off the queue without opening
+                 the Saved / Queue panels first. -->
+            <div class="bottom-actions">
+                <button id="saveCurrentBtn2" class="import-action-btn" onclick="saveCurrentSong()">
+                    <svg viewBox="0 0 24 24" width="15" height="15"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+                    <span>Save Current</span>
+                </button>
+                <button id="startQueueBtn2" class="import-action-btn" onclick="startQueue()">
+                    <svg viewBox="0 0 24 24" width="15" height="15"><path d="M5 5v14l10-7L5 5z" fill="currentColor"/></svg>
+                    <span>Start Queue</span>
+                </button>
+            </div>
+
+        </div>
+
+        <!-- Queue -->
+        <div id="queuePanel" class="queuePanel">
+            <div class="queue-head">
+                <h2>Up Next</h2>
+                <div class="queue-head-actions">
+                    <button id="startQueueBtn" onclick="startQueue()">Start Queue</button>
+                    <button id="clearQueueBtn" onclick="clearQueue()">Clear</button>
+                </div>
+            </div>
+            <div id="queueList"></div>
+        </div>
+
+    </div>
+
+</div>
+
+<script src="app.js"></script>
+
+<script>
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            if (typeof isLinkModalOpen === "function" && isLinkModalOpen()) {
+                closeLinkModal();
+            } else {
+                closeUI();
+            }
+        }
+    });
+</script>
+
+</body>
+</html>
