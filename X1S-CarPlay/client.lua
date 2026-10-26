@@ -1,20 +1,17 @@
--------------------------------------------------
--- State
--------------------------------------------------
 local vehicleNet = nil
 local soundId = nil
 local finishSent = false
 local skipLock = false
 local uiOpen = false
 local sawNearEnd = false
-local miniPlayerEnabled = false -- Mini Player on/off for the CURRENT vehicle (saved per vehicle plate), see "Mini Player toggle" below
-local streamerMode = GetResourceKvpInt("x1s_streamer_mode") == 1 -- saved per player, see "Streamer Mode" below
+local miniPlayerEnabled = false
+local streamerMode = GetResourceKvpInt("x1s_streamer_mode") == 1
 
 local activeSounds = {}
 local vehicleSongs = {}
 local vehicleVolumes = {}
 local vehiclePaused = {}
-local vehicleAudio = {} -- net -> { fade, muffle, sent } eased volume state, see "Distance Fade" below
+local vehicleAudio = {}
 
 local lastTrackedNet = nil
 local stuckLoggedNet = nil
@@ -32,9 +29,6 @@ local function DebugPrint(msg)
     end
 end
 
--------------------------------------------------
--- Helpers
--------------------------------------------------
 local function NetToVeh(net)
     return NetworkGetEntityFromNetworkId(net)
 end
@@ -57,23 +51,6 @@ local function canControl(veh)
     return GetPedInVehicleSeat(veh, -1) == ped
 end
 
--------------------------------------------------
--- Muffling / Vehicle Seal Check
--------------------------------------------------
--- A "sealed" vehicle gets the muffled volume; if a door, the roof, or a
--- window is open, sound leaks out clearly and muffling is skipped.
---
--- NOTE ON WINDOWS: GTA/FiveM has no native to read whether a window is
--- currently rolled down (only IsVehicleWindowIntact, which is about broken
--- glass, not roll position). If this server has a separate window-control
--- script, have it call the export below (or set the state bag directly)
--- whenever it rolls a window up/down so this can react to it:
---
---   exports['X1S-CarPlay']:SetVehicleWindowState(vehicle, true)  -- open
---   exports['X1S-CarPlay']:SetVehicleWindowState(vehicle, false) -- closed
---   (swap 'X1S-CarPlay' for whatever this resource's folder is actually named on your server)
---
--- Without that hook, window state is simply ignored (treated as closed).
 local function IsVehicleSealed(veh)
     if veh == 0 or not DoesEntityExist(veh) then return true end
 
@@ -87,7 +64,6 @@ local function IsVehicleSealed(veh)
     end
 
     if Config.MuffleCheckRoof and IsVehicleAConvertible(veh, false) then
-        -- 0 = roof fully up/closed; anything else (open, raising, lowering) leaks sound
         if GetConvertibleRoofState(veh) ~= 0 then
             return false
         end
@@ -108,17 +84,6 @@ exports('SetVehicleWindowState', function(vehicle, isOpen)
     Entity(vehicle).state:set('windowsOpen', isOpen and true or false, true)
 end)
 
--------------------------------------------------
--- Distance Fade
--------------------------------------------------
--- ONE place decides how loud a vehicle's music is for the local player:
---   volume = base volume * distance fade * muffle
--- and it eases smoothly toward that target ~20x per second. The xsound NUI
--- page is told the sound has a huge range (XSOUND_PASSTHRU_DISTANCE), which
--- makes it skip its own distance math (see updateVolume in
--- html/xsound/SoundPlayer.js) - before, the two systems both set the volume
--- on different timers and fought each other, which is what made the music
--- stutter/flicker when walking away from a car.
 local XSOUND_PASSTHRU_DISTANCE = 10000.0
 local FADE_TICK_MS = 50
 
@@ -128,8 +93,6 @@ local function SmoothStep(t)
     return t * t * (3.0 - 2.0 * t)
 end
 
--- 1.0 inside the vehicle / right next to it, easing down to 0.0 at
--- Config.SoundDistance.
 local function GetDistanceFade(veh)
     local d = #(GetEntityCoords(PlayerPedId()) - GetEntityCoords(veh))
     local fadeEnd = Config.SoundDistance
@@ -147,15 +110,13 @@ local function GetFadeTargets(veh, pedVeh, prevMuffle)
     end
 
     local fade = GetDistanceFade(veh)
-    local muffle = prevMuffle or 1.0 -- out of earshot: nothing audible to change
+    local muffle = prevMuffle or 1.0
     if fade > 0.0 then
         muffle = (Config.EnableMuffling and IsVehicleSealed(veh)) and Config.MuffledVolumeMultiplier or 1.0
     end
     return fade, muffle
 end
 
--- Volume a brand-new sound should START at, so it never pops in at full
--- volume for a moment when you're standing across the street.
 local function SeedVehicleAudio(net, veh)
     local fade, muffle = GetFadeTargets(veh, getCurrentVehicle(), nil)
     local vol = (vehicleVolumes[net] or Config.DefaultVolume) * fade * muffle
@@ -199,15 +160,10 @@ CreateThread(function()
                     st.fade = st.fade or targetFade
                     st.muffle = st.muffle or targetMuffle
 
-                    -- Distance fade follows the player's movement, so it only
-                    -- needs light smoothing. The muffle change (doors/roof
-                    -- opening or closing) glides at the slower, configurable
-                    -- Config.MuffleSmoothing rate - except when you're getting
-                    -- INTO the car, where it clears up quickly.
                     local muffleStep = Config.MuffleSmoothing or 1.0
                     local muffleRate = fadeRate
                     if not (pedVeh ~= 0 and pedVeh == veh) and muffleStep < 1.0 then
-                        muffleRate = -math.log(1.0 - muffleStep) / 0.2 -- per-200ms-tick setting -> per second
+                        muffleRate = -math.log(1.0 - muffleStep) / 0.2
                     end
 
                     st.fade = Ease(st.fade, targetFade, fadeRate, dt)
@@ -215,9 +171,6 @@ CreateThread(function()
 
                     vol = (vehicleVolumes[net] or Config.DefaultVolume) * st.fade * st.muffle
                 else
-                    -- Vehicle isn't streamed in on this client (too far away):
-                    -- keep the sound running silently so it's still in sync
-                    -- when you come back, and make sure it is actually silent.
                     st.fade = 0.0
                     vol = 0.0
                 end
@@ -251,13 +204,6 @@ local function SafeSeek(id, time)
     end)
 end
 
--------------------------------------------------
--- Open / Close CarPlay
--------------------------------------------------
--- Keeps the NUI's idea of "what's playing" correct for whichever vehicle
--- the player is actually in. Used when getting into a vehicle so the Mini
--- Player (and the main menu, once opened) show THAT vehicle's real state
--- instead of carrying over whatever the previous vehicle was showing.
 local function SyncVehicleStateToNUI(net)
     local song = vehicleSongs[net]
     if song then
@@ -361,15 +307,6 @@ RegisterNUICallback("close", function(_, cb)
     cb("ok")
 end)
 
--------------------------------------------------
--- Mini Player toggle (per vehicle)
--------------------------------------------------
--- The Mini Player's on/off choice is remembered PER VEHICLE (keyed by the
--- vehicle's plate, same as saved songs), saved with KVP for this player so
--- it survives reconnects. Enabled in one car and disabled in another means
--- it shows in the first and stays hidden in the second. Vehicles that were
--- never toggled default to off. Whenever the player gets into a vehicle,
--- that vehicle's saved choice is loaded and pushed to the NUI.
 local function MiniPlayerKey(veh)
     if not veh or veh == 0 then return nil end
     local plate = GetVehicleNumberPlateText(veh)
@@ -377,7 +314,6 @@ local function MiniPlayerKey(veh)
         plate = plate:gsub("^%s+", ""):gsub("%s+$", "")
     end
     if not plate or plate == "" then
-        -- No usable plate - fall back to the network id (lasts until restart).
         local net = NetworkGetNetworkIdFromEntity(veh)
         if not net or net == 0 then return nil end
         plate = "net_" .. net
@@ -404,14 +340,6 @@ RegisterNUICallback("miniPlayerToggle", function(data, cb)
     cb("ok")
 end)
 
--------------------------------------------------
--- Streamer Mode
--------------------------------------------------
--- Mutes all CarPlay music for THIS player only. The actual muting happens
--- in the NUI (xsound/SoundPlayer.js): the sound keeps playing silently so
--- the song-finished/queue logic in the main loop below keeps working and
--- other players in the car are unaffected. The choice is saved with KVP so
--- it survives reconnects.
 local function SetStreamerMode(enabled)
     streamerMode = enabled and true or false
     SetResourceKvpInt("x1s_streamer_mode", streamerMode and 1 or 0)
@@ -428,20 +356,15 @@ RegisterCommand(Config.StreamerCommand or "streamermode", function()
     SetStreamerMode(not streamerMode)
 end, false)
 
--- Toggled from the CarPlay settings menu.
 RegisterNUICallback("streamerMode", function(data, cb)
     SetStreamerMode(data and data.enabled)
     cb("ok")
 end)
 
--- The NUI asks for the saved state as soon as its page loads.
 RegisterNUICallback("streamerModeReady", function(_, cb)
     cb({ enabled = streamerMode })
 end)
 
--------------------------------------------------
--- Notifications
--------------------------------------------------
 RegisterNetEvent('x1s:notify', function(kind, message)
     if not message then return end
 
@@ -452,9 +375,6 @@ RegisterNetEvent('x1s:notify', function(kind, message)
     end
 end)
 
--------------------------------------------------
--- Play Song
--------------------------------------------------
 RegisterNUICallback("play", function(data, cb)
     local veh = getCurrentVehicle()
     if veh == 0 or not canControl(veh) then cb("fail"); return end
@@ -477,9 +397,6 @@ RegisterNUICallback("play", function(data, cb)
     cb("ok")
 end)
 
--------------------------------------------------
--- Add To Queue
--------------------------------------------------
 RegisterNUICallback("queueAdd", function(data, cb)
     local veh = getCurrentVehicle()
     if veh == 0 or not canControl(veh) then cb("fail"); return end
@@ -497,9 +414,6 @@ RegisterNUICallback("queueAdd", function(data, cb)
     cb("ok")
 end)
 
--------------------------------------------------
--- Start Queue
--------------------------------------------------
 RegisterNUICallback("startQueue", function(_, cb)
     if vehicleNet then
         TriggerServerEvent("x1s:startQueue", vehicleNet)
@@ -507,9 +421,6 @@ RegisterNUICallback("startQueue", function(_, cb)
     cb("ok")
 end)
 
--------------------------------------------------
--- Saved Songs
--------------------------------------------------
 RegisterNUICallback("saveSong", function(_, cb)
     if vehicleNet then
         TriggerServerEvent("x1s:saveSong", vehicleNet)
@@ -559,9 +470,6 @@ RegisterNUICallback("queueSaved", function(data, cb)
     cb("ok")
 end)
 
--------------------------------------------------
--- Pause / Resume
--------------------------------------------------
 RegisterNUICallback("pause", function(_, cb)
     if vehicleNet then
         TriggerServerEvent("x1s:pause", vehicleNet)
@@ -576,9 +484,6 @@ RegisterNUICallback("resume", function(_, cb)
     cb("ok")
 end)
 
--------------------------------------------------
--- Skip
--------------------------------------------------
 RegisterNUICallback("skip", function(_, cb)
     if vehicleNet then
         finishSent = true
@@ -593,9 +498,6 @@ RegisterNUICallback("skip", function(_, cb)
     cb("ok")
 end)
 
--------------------------------------------------
--- Seek
--------------------------------------------------
 RegisterNUICallback("seek", function(data, cb)
     if vehicleNet then
         local time = tonumber(data.time)
@@ -609,9 +511,6 @@ RegisterNUICallback("seek", function(data, cb)
     cb("ok")
 end)
 
--------------------------------------------------
--- Remove Song From Queue
--------------------------------------------------
 RegisterNUICallback("remove", function(data, cb)
     if vehicleNet then
         TriggerServerEvent("x1s:removeFromQueue", vehicleNet, data.index)
@@ -619,9 +518,6 @@ RegisterNUICallback("remove", function(data, cb)
     cb("ok")
 end)
 
--------------------------------------------------
--- Volume
--------------------------------------------------
 RegisterNUICallback("volume", function(data, cb)
     if vehicleNet then
         TriggerServerEvent("x1s:setVolume", data.vol, vehicleNet)
@@ -632,18 +528,11 @@ end)
 RegisterNetEvent("x1s:updateVolume", function(vol, net)
     vehicleVolumes[net] = vol
 
-    -- The Distance Fade loop applies the new base volume within ~50ms, eased
-    -- with the distance/muffle multipliers - setting it here would briefly
-    -- blast full volume at anyone who is standing away from the car.
-
     if (uiOpen or miniPlayerEnabled) and vehicleNet == net then
         SendNUIMessage({ action = "volumeSync", volume = vol })
     end
 end)
 
--------------------------------------------------
--- Pause State Sync
--------------------------------------------------
 RegisterNetEvent("x1s:setPaused", function(net, paused, elapsed)
     vehiclePaused[net] = paused
 
@@ -670,9 +559,6 @@ RegisterNetEvent("x1s:setPaused", function(net, paused, elapsed)
     end
 end)
 
--------------------------------------------------
--- Seek Broadcast
--------------------------------------------------
 RegisterNetEvent("x1s:seek", function(net, time)
     local id = "car_" .. net
 
@@ -699,14 +585,11 @@ RegisterNetEvent("x1s:seek", function(net, time)
     end
 end)
 
--------------------------------------------------
--- Drift Correction
--------------------------------------------------
 RegisterNetEvent("x1s:driftCorrect", function(net, elapsed)
     local id = "car_" .. net
     if not soundExists(id) then return end
     if vehiclePaused[net] then return end
-    if (getMaxDuration(id) or 0) <= 0 then return end -- player not actually ready/loaded yet
+    if (getMaxDuration(id) or 0) <= 0 then return end
 
     local cur = getTimeStamp(id) or 0
     local threshold = Config.DriftCorrectionThreshold or 1.0
@@ -717,9 +600,6 @@ RegisterNetEvent("x1s:driftCorrect", function(net, elapsed)
     end
 end)
 
--------------------------------------------------
--- Sync Song
--------------------------------------------------
 RegisterNetEvent("x1s:syncSong", function(data)
     local veh = NetToVeh(data.net)
     if veh == 0 then return end
@@ -792,9 +672,6 @@ RegisterNetEvent("x1s:syncSong", function(data)
     end
 end)
 
--------------------------------------------------
--- Full Sync
--------------------------------------------------
 RegisterNetEvent("x1s:fullSync", function(snapshot)
     for _, data in ipairs(snapshot) do
         local veh = NetToVeh(data.net)
@@ -843,9 +720,6 @@ RegisterNetEvent("x1s:fullSync", function(snapshot)
     end
 end)
 
--------------------------------------------------
--- Queue Update
--------------------------------------------------
 RegisterNetEvent("x1s:updateQueue", function(net, queue, queueActive)
     if uiOpen and vehicleNet == net then
         SendNUIMessage({
@@ -856,9 +730,6 @@ RegisterNetEvent("x1s:updateQueue", function(net, queue, queueActive)
     end
 end)
 
--------------------------------------------------
--- Saved Songs Sync
--------------------------------------------------
 RegisterNetEvent("x1s:savedSongsSync", function(net, songs)
     if uiOpen and vehicleNet == net then
         SendNUIMessage({
@@ -868,9 +739,6 @@ RegisterNetEvent("x1s:savedSongsSync", function(net, songs)
     end
 end)
 
--------------------------------------------------
--- Playlist Import Result
--------------------------------------------------
 RegisterNetEvent("x1s:playlistImportResult", function(success, err, added, total)
     if uiOpen then
         SendNUIMessage({
@@ -883,9 +751,6 @@ RegisterNetEvent("x1s:playlistImportResult", function(success, err, added, total
     end
 end)
 
--------------------------------------------------
--- Destroy Sound
--------------------------------------------------
 RegisterNetEvent("x1s:destroyCarSound", function(net)
     local id = "car_" .. net
 
@@ -910,9 +775,6 @@ RegisterNetEvent("x1s:destroyCarSound", function(net)
     end
 end)
 
--------------------------------------------------
--- Joining Sync
--------------------------------------------------
 CreateThread(function()
     while not NetworkIsPlayerActive(PlayerId()) do
         Wait(500)
@@ -921,9 +783,6 @@ CreateThread(function()
     TriggerServerEvent("x1s:requestSync")
 end)
 
--------------------------------------------------
--- Fast Position Loop
--------------------------------------------------
 CreateThread(function()
     while true do
         Wait(0)
@@ -940,9 +799,6 @@ CreateThread(function()
     end
 end)
 
--------------------------------------------------
--- Main Loop
--------------------------------------------------
 CreateThread(function()
     while true do
         Wait(Config.PositionUpdateInterval or 200)
@@ -956,7 +812,6 @@ CreateThread(function()
                 if soundExists(id) then
                     local isInside = pedVeh ~= 0 and pedVeh == veh
 
-                    -- Volume/distance are handled by the Distance Fade loop.
                     if not isInside then
                         Position(id, GetEntityCoords(veh))
                     end
@@ -1044,9 +899,6 @@ CreateThread(function()
     end
 end)
 
--------------------------------------------------
--- Exit Vehicle Cleanup
--------------------------------------------------
 CreateThread(function()
     local wasInVehicle = false
     local lastVeh = 0
@@ -1057,25 +909,13 @@ CreateThread(function()
         local veh = getCurrentVehicle()
         local inVeh = veh ~= 0
 
-        -- The Mini Player is only ever supposed to show while actually
-        -- inside a vehicle - tell the NUI whenever that changes so it can
-        -- hide itself immediately on foot, regardless of song state.
         if inVeh ~= wasInVehicle then
             SendNUIMessage({ action = "vehicleState", inVehicle = inVeh })
         end
 
         if inVeh and (not wasInVehicle or veh ~= lastVeh) then
-            -- Load THIS vehicle's own Mini Player on/off choice.
             LoadMiniPlayerForVehicle(veh)
 
-            -- Just got into a vehicle (any vehicle, could be a different
-            -- one from last time). Every live-update sender below (volume
-            -- changes, progress ticks, pause/resume, seeks) already checks
-            -- "vehicleNet == net" before forwarding to the NUI - that was
-            -- previously only ever set by opening the full menu, so the
-            -- Mini Player got a one-time snapshot on entry and then nothing
-            -- else. Setting it here too means those same checks pass for
-            -- the Mini Player as well, not just the open main menu.
             local net = NetworkGetNetworkIdFromEntity(veh)
             if net and net ~= 0 then
                 vehicleNet = net
@@ -1088,13 +928,6 @@ CreateThread(function()
             if uiOpen then
                 CloseCarPlay()
             end
-            -- Deliberately NOT clearing the Mini Player here: the vehicle's
-            -- song keeps playing after you get out (that's the whole point
-            -- of the muffled-from-outside effect), so wiping the display on
-            -- exit just means it shows nothing on re-entry instead of the
-            -- song that's actually still going. vehicleState above already
-            -- hides the widget while on foot; the entry sync above puts the
-            -- right song back the moment you get back in.
 
             vehicleNet = nil
             soundId = nil
@@ -1102,7 +935,7 @@ CreateThread(function()
             sawNearEnd = false
             stuckSince = nil
             skipLock = false
-            miniPlayerEnabled = false -- on foot; the next vehicle loads its own choice
+            miniPlayerEnabled = false
         end
 
         wasInVehicle = inVeh
@@ -1110,9 +943,6 @@ CreateThread(function()
     end
 end)
 
--------------------------------------------------
--- Radio Install
--------------------------------------------------
 local installingRadio = false
 
 local function DrawInstallBar(pct, label)
@@ -1163,9 +993,6 @@ RegisterNetEvent('x1s:radio:beginInstall', function(net, duration)
     end)
 end)
 
--------------------------------------------------
--- ox_inventory integration
--------------------------------------------------
 exports('x1s_useRadioItem', function(data, slot)
     if getCurrentVehicle() == 0 then
         Notify("You need to be seated in a vehicle to install a radio.")
@@ -1180,9 +1007,6 @@ exports('x1s_useRadioItem', function(data, slot)
     end)
 end)
 
--------------------------------------------------
--- Cleanup
--------------------------------------------------
 AddEventHandler('onResourceStop', function(resourceName)
     if resourceName ~= GetCurrentResourceName() then return end
     SetNuiFocus(false, false)
