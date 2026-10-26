@@ -1,13 +1,7 @@
--------------------------------------------------
--- X1S CarPlay - Radio Item / Install
--------------------------------------------------
 X1SRadio = {}
 
 X1SRadio.Framework = "standalone" -- KEEP STANDALONE
 
--------------------------------------------------
--- Small helpers
--------------------------------------------------
 local function NormalizePlate(plate)
     if type(plate) ~= "string" then return nil end
     plate = plate:gsub("^%s+", ""):gsub("%s+$", "")
@@ -29,9 +23,6 @@ local function NotifyPlayer(src, kind, message)
     TriggerClientEvent("x1s:notify", src, kind, message)
 end
 
--------------------------------------------------
--- oxmysql
--------------------------------------------------
 local oxmysqlAvailable = GetResourceState("oxmysql") == "started"
 local radioSystemActive = (Config.Radio and Config.Radio.RequireInstall) and oxmysqlAvailable or false
 
@@ -43,9 +34,6 @@ if Config.Radio and Config.Radio.RequireInstall and not oxmysqlAvailable then
         .. "Config.Radio.RequireInstall = false in config.lua to silence this.")
 end
 
--------------------------------------------------
--- Database helpers
--------------------------------------------------
 local function DbQuery(sql, params)
     local ok, result = pcall(function()
         local p = promise.new()
@@ -76,9 +64,6 @@ local function DbScalar(sql, params)
     return result
 end
 
--------------------------------------------------
--- Framework Detection
--------------------------------------------------
 local ESX = nil
 local QBCore = nil
 local usingOxInventory = false
@@ -104,9 +89,6 @@ local function InitFrameworkBridge()
         :format(X1SRadio.Framework, tostring(usingOxInventory), tostring(radioSystemActive)))
 end
 
--------------------------------------------------
--- Persistence
--------------------------------------------------
 local installedCache = {}
 
 if radioSystemActive then
@@ -162,9 +144,6 @@ local function MarkInstalled(plate)
     return true
 end
 
--------------------------------------------------
--- Item Removal
--------------------------------------------------
 function X1SRadio.RemoveItem(src, itemName)
     if usingOxInventory then
         local ok, removed = pcall(function()
@@ -192,7 +171,6 @@ function X1SRadio.RemoveItem(src, itemName)
         return true
     end
 
-    -- Standalone: our own ledger.
     local identifier = GetStandaloneIdentifier(src)
     local count = DbScalar(
         "SELECT radio_count FROM x1s_carplay_standalone_items WHERE identifier = ?", { identifier }
@@ -205,10 +183,7 @@ function X1SRadio.RemoveItem(src, itemName)
     return true
 end
 
--------------------------------------------------
--- Begin Install
--------------------------------------------------
-local pendingInstalls = {} -- [src] = { net, plate, itemName, removeOnFinish, startedAt }
+local pendingInstalls = {}
 
 function X1SRadio.TryBeginInstall(src, itemName, removeOnFinish)
     if not radioSystemActive then
@@ -308,9 +283,6 @@ RegisterNetEvent("x1s:radio:tryBeginInstall", function()
     X1SRadio.TryBeginInstall(src, Config.Radio.Item, true)
 end)
 
--------------------------------------------------
--- Open Request
--------------------------------------------------
 RegisterNetEvent("x1s:requestOpen", function(net)
     local src = source
     if not radioSystemActive then
@@ -330,9 +302,6 @@ RegisterNetEvent("x1s:requestOpen", function(net)
     TriggerClientEvent("x1s:openResult", src, net, true)
 end)
 
--------------------------------------------------
--- Framework Hooks
--------------------------------------------------
 CreateThread(function()
     InitFrameworkBridge()
 
@@ -388,9 +357,6 @@ CreateThread(function()
     end
 end)
 
--------------------------------------------------
--- Generic export
--------------------------------------------------
 exports("UseRadioItem", function(src)
     return X1SRadio.TryBeginInstall(src, Config.Radio.Item, false)
 end)
