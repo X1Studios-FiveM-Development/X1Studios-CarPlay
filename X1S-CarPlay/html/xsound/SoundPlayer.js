@@ -204,12 +204,6 @@ class SoundPlayer {
         }
     }
 
-    // Taps the underlying <audio> element Howler created for this sound
-    // and routes its output through a BiquadFilterNode (lowpass) instead
-    // of straight to the speakers, so the cutoff can be swept down for a
-    // real "muffled" effect. Not possible for YouTube sounds: that audio
-    // plays inside YouTube's own cross-origin iframe, which the browser
-    // will never expose to a page's Web Audio graph.
     destroyYoutubeApi() {
         if (this.yPlayer) {
             if (typeof this.yPlayer.stopVideo === "function" && typeof this.yPlayer.destroy === "function") {
@@ -232,9 +226,6 @@ class SoundPlayer {
     }
 
     updateVolume(dd, maxd) {
-        // client.lua drives CarPlay vehicle sounds itself (smooth distance fade +
-        // muffling) and registers them with this huge range so the proximity math
-        // below does not fight with it. See "Distance Fade" in client.lua.
         if (maxd >= 10000) return;
         const d_max = maxd;
         const d_now = dd;
