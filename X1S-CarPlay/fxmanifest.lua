@@ -21,12 +21,6 @@ shared_scripts {
     'config.lua'
 }
 
--- xsound/* must load before client.lua: client.lua calls its
--- functions (setVolume, PlayUrlPos, ...) directly now that both live
--- in this one resource, rather than through exports.xsound:*.
--- xsound/config.lua defines the lowercase `config` table its own
--- files use internally - unrelated to this resource's own `Config`
--- (capital C) in config.lua above.
 client_scripts {
     'xsound/config.lua',
     'xsound/main.lua',
