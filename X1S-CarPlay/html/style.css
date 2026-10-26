@@ -1,6 +1,3 @@
-/* =============================================
-   Tokens
-============================================= */
 :root {
     --bg-panel: #17171b;
     --bg-panel-2: #1d1d22;
@@ -20,9 +17,6 @@
     --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-/* =============================================
-   Base
-============================================= */
 * { box-sizing: border-box; }
 
 body {
@@ -38,17 +32,11 @@ body {
     * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 
-/* =============================================
-   Deck Layout
-============================================= */
 .deck {
     position: fixed;
     inset: 0;
 }
 
-/* Main head unit sits dead-center of the screen. Starts scaled down and
-   transparent, and animates in/out as #app picks up/loses .ui-visible
-   (see the NUI "show"/"hide" handling in app.js). */
 .carplay {
     position: fixed;
     top: 50%;
@@ -63,10 +51,6 @@ body {
     opacity: 1;
 }
 
-/* The rail and queue are pinned a few pixels off the main UI's edges,
-   measured from screen-center using the main UI's fixed half-width -
-   so they sit right next to it no matter their own width, and the
-   main UI itself stays perfectly centered. */
 .vol-rail {
     position: fixed;
     top: 50%;
@@ -88,12 +72,6 @@ body {
     transform: translateY(-50%) translateX(20px);
 }
 
-/* Saved-songs panel sits one more slot out - to the left of the volume
-   rail (rail is 60px wide, 6px gap on either side of it). On narrower
-   screens that "natural" slot would push the panel's left edge past the
-   edge of the screen (or flush against it), so `right` is capped with
-   min() to whichever is smaller: the normal slot position, or whatever
-   keeps a minimum 24px gap from the left edge of the viewport. */
 .savedPanel {
     position: fixed;
     top: 50%;
@@ -104,9 +82,6 @@ body {
     transform: translateY(-50%) translateX(-20px);
 }
 
-/* =============================================
-   Vertical Volume Rail (signature control)
-============================================= */
 .vol-rail {
     display: flex;
     flex-direction: column;
@@ -165,9 +140,6 @@ body {
     letter-spacing: 0.5px;
 }
 
-/* =============================================
-   Main Head Unit
-============================================= */
 .carplay {
     width: 360px;
     background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-panel-2) 100%);
@@ -216,10 +188,6 @@ body {
 .close:hover { color: var(--text-hi); background: rgba(255, 255, 255, 0.06); }
 .close:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 
-/* =============================================
-   Panel Toggles (Saved / Queue) - side panels are
-   hidden until one of these is pressed.
-============================================= */
 .panel-toggles {
     display: flex;
     gap: 8px;
@@ -272,7 +240,6 @@ body {
 
 .panel-toggle-btn.active .badge { background: rgba(14, 14, 17, 0.25); }
 
-/* Album Art */
 .art-wrap {
     position: relative;
     width: 100%;
@@ -305,7 +272,6 @@ body {
     color: var(--text-lo);
 }
 
-/* Song Info */
 .info {
     text-align: center;
     margin-bottom: 12px;
@@ -328,9 +294,6 @@ body {
     text-overflow: ellipsis;
 }
 
-/* =============================================
-   Progress
-============================================= */
 .progress {
     position: relative;
     width: 100%;
@@ -340,8 +303,6 @@ body {
     cursor: pointer;
 }
 
-/* Invisible taller hit-area layered over the thin track, so the bar is
-   easy to click/drag without changing its visual thickness. */
 .progress::before {
     content: "";
     position: absolute;
@@ -393,9 +354,6 @@ body {
     font-variant-numeric: tabular-nums;
 }
 
-/* =============================================
-   Controls
-============================================= */
 .controls {
     display: flex;
     justify-content: center;
@@ -427,7 +385,6 @@ body {
 .ctrl-btn:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 
 #playpause {
-    /* Fixed size so swapping play/pause icons never changes the button. */
     width: 82px;
     height: 49px;
     padding: 0;
@@ -441,9 +398,6 @@ body {
     padding: 0 18px;
 }
 
-/* =============================================
-   Link Input
-============================================= */
 .link-row {
     display: flex;
     gap: 8px;
@@ -465,7 +419,6 @@ body {
 #link::placeholder { color: var(--text-lo); }
 #link:focus { border-color: var(--red); }
 
-/* Play (immediate) + Add to Queue, side by side under the link field. */
 .link-actions {
     display: flex;
     gap: 8px;
@@ -496,19 +449,12 @@ body {
     text-align: center;
 }
 
-/* (legacy) Save Current / Import Playlist shortcuts at the very bottom of the
-   main head unit - same button look as the Saved panel's own pair
-   (.import-action-btn), just without that pair's divider styling since
-   there's nothing below these to separate from. */
 .bottom-actions {
     display: flex;
     gap: 10px;
     margin-top: 12px;
 }
 
-/* =============================================
-   Queue Panel
-============================================= */
 .queuePanel, .savedPanel {
     display: flex;
     flex-direction: column;
@@ -521,10 +467,6 @@ body {
     overflow: hidden;
     max-height: 90vh;
 
-    /* Closed by default - slid a little toward the main UI and
-       transparent. toggleQueuePanel()/toggleSavedPanel() in app.js add
-       .panel-visible (after forcing a reflow) so this actually
-       transitions instead of snapping in with the display change. */
     opacity: 0;
     pointer-events: none;
     transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease;
@@ -538,12 +480,8 @@ body {
 .queuePanel.panel-visible { transform: translateY(-50%) translateX(0); }
 .savedPanel.panel-visible { transform: translateY(-50%) translateX(0); }
 
-/* Widths are fixed; height is synced to the main head unit's actual
-   rendered height at runtime (see syncPanelHeights() in app.js) so both
-   side panels always match the main UI's height exactly, even as its
-   content changes. */
-.queuePanel { width: 360px; } /* same width as .carplay */
-.savedPanel { width: 560px; } /* wide enough for 3 fixed 150px cards per row plus the scrollbar */
+.queuePanel { width: 360px; }
+.savedPanel { width: 560px; }
 
 .queue-head {
     flex-shrink: 0;
@@ -580,8 +518,6 @@ body {
 
 #clearQueueBtn:hover { text-decoration: underline; }
 
-/* Start Queue gets a bordered, more prominent treatment than the plain
-   text-link "Clear" - it's the button that actually kicks off playback. */
 #startQueueBtn {
     background: var(--bg-inset);
     border: 1px solid var(--red-dim);
@@ -597,10 +533,6 @@ body {
 #startQueueBtn:hover { background: var(--red); color: var(--bg-inset); }
 #startQueueBtn:disabled { opacity: 0.4; cursor: not-allowed; background: var(--bg-inset); color: var(--red); }
 
-/* Save Song / Import Playlist buttons in the saved-songs panel - sit
-   side by side with a divider underneath separating them from the
-   gallery below. Both open the shared link-entry modal instead of
-   having their own inline input+button next to them. */
 .import-actions {
     flex-shrink: 0;
     display: flex;
@@ -632,8 +564,6 @@ body {
 .import-action-btn:disabled { opacity: 0.4; cursor: not-allowed; background-color: var(--bg-inset); color: var(--red); }
 .import-action-btn svg { flex-shrink: 0; }
 
-/* Shared Save Song / Import Playlist modal - opened by either button
-   above, switched between "song" and "playlist" mode in JS. */
 .link-modal-overlay {
     display: flex;
     position: fixed;
@@ -728,7 +658,6 @@ body {
 .link-modal-submit:hover { background-color: var(--red); color: var(--bg-inset); }
 .link-modal-submit:disabled { opacity: 0.5; cursor: not-allowed; background-color: var(--bg-inset); color: var(--red); }
 
-/* Save Current, in the saved-songs panel header - same treatment. */
 #saveCurrentBtn {
     background: var(--bg-inset);
     border: 1px solid var(--red-dim);
@@ -746,14 +675,10 @@ body {
 
 #queueList, #savedList {
     flex: 1;
-    min-height: 0; /* required for a flex child to actually be allowed to scroll */
+    min-height: 0;
     overflow-y: auto;
     padding-right: 4px;
 
-    /* Themed scrollbar - matches the panel's dark inset + red accent
-       instead of the browser's default bar. Firefox uses scrollbar-width
-       / scrollbar-color; CEF (what FiveM's NUI runs on) is Chromium-based
-       and reads the ::-webkit-scrollbar rules below. */
     scrollbar-width: thin;
     scrollbar-color: var(--red-dim) var(--bg-inset);
 }
@@ -777,17 +702,8 @@ body {
     background: var(--red);
 }
 
-/* =============================================
-   Saved Songs - Gallery View
-============================================= */
 #savedList.gallery {
     display: grid;
-    /* Fixed-size columns instead of minmax(150px, 1fr) - with 1fr the
-       columns stretch to fill leftover row width, so cards change size
-       depending on how many fit. A fixed 150px keeps every card exactly
-       the same size no matter how many songs are saved; once they no
-       longer fit the panel's height, #savedList's own overflow-y:auto
-       (below) scrolls instead of anything shrinking. */
     grid-template-columns: repeat(auto-fill, 150px);
     grid-auto-rows: min-content;
     justify-content: start;
@@ -860,9 +776,6 @@ body {
 .gallery-action:hover { background: var(--red); color: var(--bg-inset); }
 .gallery-action:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 
-/* The "▶" glyph's visual weight sits left of its own character box, so
-   centering it normally still looks off-center inside the round button.
-   Nudge it right slightly to optically re-center it. */
 .gallery-action.gplay {
     padding-left: 3px;
 }
@@ -925,13 +838,6 @@ body {
 
 .queue-item button:hover { color: var(--red); }
 
-/* =============================================
-   Toast Notifications - confirmation/error feedback
-   for actions like saving a song, importing a playlist,
-   starting the queue, etc. Fired from showToast() in
-   app.js, either from a local check or an "notify" NUI
-   message relayed from the server's response.
-============================================= */
 .toast-container {
     position: fixed;
     top: 50%;
@@ -983,13 +889,6 @@ body {
 .toast-success .toast-icon { color: var(--green); }
 .toast-error .toast-icon { color: var(--red); }
 
-/* =============================================
-   Mini Player - persistent now-playing widget shown
-   above the minimap (bottom-left) while the main
-   head unit is closed. Independent of #app, so it
-   keeps its own opacity/transform-driven show/hide
-   instead of the display:none swap #app uses.
-============================================= */
 .mini-player {
     position: fixed;
     left: calc(20px + var(--mini-x, 0px));
@@ -1074,7 +973,7 @@ body {
 
 .mini-info {
     flex: 1;
-    min-width: 0; /* required for text-overflow ellipsis to actually kick in inside flex */
+    min-width: 0;
 }
 
 .mini-song-title {
@@ -1094,8 +993,6 @@ body {
     text-overflow: ellipsis;
 }
 
-/* Mini version of the main UI's .progress / #bar - same look, just
-   thinner and read-only (no scrub handle, no click-to-seek). */
 .mini-progress {
     position: relative;
     width: 100%;
@@ -1141,9 +1038,6 @@ body {
     opacity: 0.55;
 }
 
-/* =============================================
-   Settings box (under the volume rail) + Settings menu
-============================================= */
 .top-boxes {
     position: absolute;
     bottom: calc(100% + 6px);
@@ -1176,8 +1070,6 @@ body {
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
 }
 
-/* While the settings menu is open the whole main UI (head unit, rail,
-   side panels) is hidden so the Mini Player can be seen and positioned. */
 #app.settings-open .deck {
     opacity: 0;
     visibility: hidden;
@@ -1299,7 +1191,6 @@ body {
 .pos-val:hover { border-color: var(--red-dim); }
 .pos-val:focus { border-color: var(--red); }
 
-/* ---------- Settings hub / sub-views ---------- */
 .settings-view { display: none; }
 .settings-view-active { display: block; }
 
@@ -1350,7 +1241,6 @@ body {
     box-shadow: 0 0 10px var(--red-glow);
 }
 
-/* On/off switch */
 .switch {
     flex: 0 0 auto;
     position: relative;
@@ -1397,7 +1287,6 @@ body {
 .settings-back:hover { border-color: var(--red-dim); }
 .settings-back:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 
-/* Accent swatches */
 .accent-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -1433,13 +1322,6 @@ body {
 .accent-swatch.selected { border-color: var(--text-hi); color: var(--text-hi); }
 .accent-swatch.selected .swatch-dot svg { opacity: 1; }
 
-/* =============================================
-   Settings inside the player box (hub + accent views)
-   The album art is swapped for the settings panel, the title becomes
-   "CarPlay Settings", and everything else is greyed out + disabled.
-   (The Mini Player Position view is different: it hides the whole UI,
-   see #app.settings-open .deck above.)
-============================================= */
 .settings-panel,
 .settings-info-title,
 .settings-info-sub { display: none; }
@@ -1464,8 +1346,6 @@ body {
 .settings-panel .settings-back { background: var(--bg-panel); }
 .settings-panel .settings-done { margin-top: 4px; }
 
-/* Title swap: song title/artist are left alone underneath (so song changes
-   still update them) and simply hidden while settings are open. */
 #app.settings-active #title,
 #app.settings-active #artist { display: none; }
 
@@ -1484,7 +1364,6 @@ body {
     margin-top: 2px;
 }
 
-/* Grey out everything that isn't part of the settings. */
 #app.settings-active .topbar,
 #app.settings-active .panel-toggles,
 #app.settings-active .progress,
@@ -1504,7 +1383,6 @@ body {
     transition: opacity 0.2s ease, filter 0.2s ease;
 }
 
-/* The gear stays live (click again to close) and lights up while open. */
 #app.settings-active #openSettingsBtn {
     background: var(--red);
     border-color: var(--red);
