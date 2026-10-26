@@ -2,7 +2,7 @@ fx_version 'cerulean'
 game 'gta5'
 
 author 'X1Studios'
-description 'CarPlay v2.5 - Fully Reworked UI and System (self-contained: bundles xSound, no separate resource needed)'
+description 'CarPlay - Advanced In Car Experience'
 version '2.5.0'
 
 ui_page 'html/index.html'
