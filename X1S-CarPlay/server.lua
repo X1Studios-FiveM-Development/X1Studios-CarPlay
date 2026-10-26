@@ -1,6 +1,3 @@
--------------------------------------------------
--- Startup Banner
--------------------------------------------------
 AddEventHandler('onResourceStart', function(resourceName)
     if resourceName ~= GetCurrentResourceName() then return end
 
@@ -12,13 +9,10 @@ AddEventHandler('onResourceStart', function(resourceName)
  /_/ \_\  |_| |____/
 
   X1Studios CarPlay
-       v2.0.0
+       v2.5.0
     ]])
 end)
 
--------------------------------------------------
--- Vehicle State
--------------------------------------------------
 local vehicleQueues = {}
 
 local function GetVehicleState(net)
@@ -54,9 +48,6 @@ local function NotifyPlayer(src, kind, message)
     TriggerClientEvent("x1s:notify", src, kind, message)
 end
 
--------------------------------------------------
--- Validation Helpers
--------------------------------------------------
 local function ValidateControl(src, net)
     if not net or net <= 0 then return false end
 
@@ -85,9 +76,6 @@ local function ValidateControl(src, net)
     return true
 end
 
--------------------------------------------------
--- Blacklisted Songs
--------------------------------------------------
 local function ExtractVideoId(link)
     if type(link) ~= "string" then return nil end
 
@@ -126,7 +114,6 @@ end
 local function SanitizeSongData(data)
     if type(data) ~= "table" then return nil end
     if type(data.link) ~= "string" or data.link == "" then return nil end
-    -- Only allow http(s) links - never trust a client-supplied URL blindly.
     if not data.link:match("^https?://") then return nil end
 
     local function cleanText(v, fallback, maxLen)
@@ -143,9 +130,6 @@ local function SanitizeSongData(data)
     }
 end
 
--------------------------------------------------
--- Play Next Song
--------------------------------------------------
 local function PlayNext(net)
     local data = vehicleQueues[net]
     if not data then return end
@@ -188,9 +172,6 @@ local function PlayNext(net)
     BroadcastQueue(net)
 end
 
--------------------------------------------------
--- Immediate Playback
--------------------------------------------------
 local function StartPlayback(net, state, songData)
     state.current = songData
     state.startedAt = GetGameTimer()
@@ -210,9 +191,6 @@ local function StartPlayback(net, state, songData)
     BroadcastQueue(net)
 end
 
--------------------------------------------------
--- Play Song
--------------------------------------------------
 RegisterNetEvent('x1s:playSong', function(rawData)
     local src = source
     if not rawData or not rawData.net or rawData.net <= 0 then return end
@@ -239,9 +217,6 @@ RegisterNetEvent('x1s:playSong', function(rawData)
     NotifyPlayer(src, "success", "Now playing " .. (songData.title or "your song") .. ".")
 end)
 
--------------------------------------------------
--- Add To Queue
--------------------------------------------------
 RegisterNetEvent('x1s:addToQueue', function(rawData)
     local src = source
     if not rawData or not rawData.net or rawData.net <= 0 then return end
@@ -274,9 +249,6 @@ RegisterNetEvent('x1s:addToQueue', function(rawData)
     NotifyPlayer(src, "success", "Added \"" .. (songData.title or "song") .. "\" to the queue.")
 end)
 
--------------------------------------------------
--- Start Queue
--------------------------------------------------
 RegisterNetEvent('x1s:startQueue', function(net)
     local src = source
     if not ValidateControl(src, net) then
@@ -305,9 +277,6 @@ RegisterNetEvent('x1s:startQueue', function(net)
     NotifyPlayer(src, "success", "Queue started.")
 end)
 
--------------------------------------------------
--- Manual Skip
--------------------------------------------------
 local advanceCooldown = {}
 
 local function TryAdvance(net)
@@ -328,9 +297,6 @@ RegisterNetEvent('x1s:skip', function(net)
     TryAdvance(net)
 end)
 
--------------------------------------------------
--- Auto Finish
--------------------------------------------------
 RegisterNetEvent('x1s:songFinished', function(net)
     local src = source
     if not net or not vehicleQueues[net] then return end
@@ -339,9 +305,6 @@ RegisterNetEvent('x1s:songFinished', function(net)
     TryAdvance(net)
 end)
 
--------------------------------------------------
--- Queue Re-Sync
--------------------------------------------------
 RegisterNetEvent('x1s:requestQueue', function(net)
     local src = source
     if not net or net <= 0 then return end
@@ -350,9 +313,6 @@ RegisterNetEvent('x1s:requestQueue', function(net)
     TriggerClientEvent("x1s:updateQueue", src, net, state and state.queue or {}, state and state.queueActive or false)
 end)
 
--------------------------------------------------
--- Remove From Queue
--------------------------------------------------
 RegisterNetEvent("x1s:removeFromQueue", function(net, index)
     local src = source
     if not ValidateControl(src, net) then return end
@@ -375,9 +335,6 @@ RegisterNetEvent("x1s:removeFromQueue", function(net, index)
     BroadcastQueue(net)
 end)
 
--------------------------------------------------
--- Pause / Resume
--------------------------------------------------
 RegisterNetEvent('x1s:pause', function(net)
     local src = source
     if not ValidateControl(src, net) then return end
@@ -406,9 +363,6 @@ RegisterNetEvent('x1s:resume', function(net)
     TriggerClientEvent('x1s:setPaused', -1, net, false, GetElapsed(state))
 end)
 
--------------------------------------------------
--- Seek
--------------------------------------------------
 RegisterNetEvent('x1s:seek', function(net, time)
     local src = source
     if not ValidateControl(src, net) then return end
@@ -430,9 +384,6 @@ RegisterNetEvent('x1s:seek', function(net, time)
     TriggerClientEvent('x1s:seek', -1, net, time)
 end)
 
--------------------------------------------------
--- Volume Sync
--------------------------------------------------
 RegisterNetEvent('x1s:setVolume', function(vol, net)
     local src = source
     if not ValidateControl(src, net) then return end
@@ -450,9 +401,6 @@ RegisterNetEvent('x1s:setVolume', function(vol, net)
     TriggerClientEvent('x1s:updateVolume', -1, vol, net)
 end)
 
--------------------------------------------------
--- Saved Songs
--------------------------------------------------
 local savedPlaylists = {}
 
 local function NormalizePlate(plate)
@@ -599,9 +547,6 @@ RegisterNetEvent('x1s:saveSongByLink', function(net, rawData)
     NotifyPlayer(src, "success", "Saved \"" .. (songData.title or "song") .. "\".")
 end)
 
--------------------------------------------------
--- Save Playlists
--------------------------------------------------
 local function ExtractPlaylistId(link)
     if type(link) ~= "string" then return nil end
     return link:match("[?&]list=([%w_%-]+)")
@@ -920,9 +865,6 @@ RegisterNetEvent('x1s:queueSavedSong', function(net, index)
     NotifyPlayer(src, "success", "Added \"" .. (songData.title or "song") .. "\" to the queue.")
 end)
 
--------------------------------------------------
--- Sync For New
--------------------------------------------------
 RegisterNetEvent('x1s:requestSync', function()
     local src = source
     local snapshot = {}
@@ -947,9 +889,6 @@ RegisterNetEvent('x1s:requestSync', function()
     end
 end)
 
--------------------------------------------------
--- Vehicle Delete Detection
--------------------------------------------------
 CreateThread(function()
     while true do
         Wait(2000)
@@ -965,9 +904,6 @@ CreateThread(function()
     end
 end)
 
--------------------------------------------------
--- Periodic Drift Correction
--------------------------------------------------
 CreateThread(function()
     while true do
         Wait(Config.DriftCorrectionInterval or 30000)
@@ -983,9 +919,6 @@ CreateThread(function()
     end
 end)
 
--------------------------------------------------
--- Update Checker
--------------------------------------------------
 local resourceName = GetCurrentResourceName()
 local currentVersion = GetResourceMetadata(resourceName, 'version', 0)
 
