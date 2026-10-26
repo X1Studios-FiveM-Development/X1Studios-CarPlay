@@ -1,6 +1,3 @@
-// ==============================
-// Global State
-// ==============================
 window.playing = false;
 window.queue = [];
 window.queueActive = false;
@@ -24,7 +21,6 @@ const bar = document.getElementById("bar");
 const timeCur = document.getElementById("timeCur");
 const timeDur = document.getElementById("timeDur");
 const playPauseBtn = document.getElementById("playpause");
-// SVG icons (same box size) so the button never resizes when toggling.
 const PLAY_ICON = '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M7 4.5v15l12-7.5-12-7.5z" fill="currentColor"/></svg>';
 const PAUSE_ICON = '<svg viewBox="0 0 24 24" width="22" height="22"><rect x="6" y="4.5" width="4" height="15" rx="1" fill="currentColor"/><rect x="14" y="4.5" width="4" height="15" rx="1" fill="currentColor"/></svg>';
 const playBtn = document.getElementById("playbtn");
@@ -47,10 +43,6 @@ const restartbtn = document.getElementById("restartbtn");
 
 const toastContainer = document.getElementById("toastContainer");
 
-// How long the open/close animations take (ms) - kept in sync with the
-// CSS transition durations on .carplay / .vol-rail / .queuePanel /
-// .savedPanel, so display:none is only applied once they've actually
-// finished animating out.
 const UI_ANIM_MS = 260;
 
 const linkModalOverlay = document.getElementById("linkModalOverlay");
@@ -58,14 +50,13 @@ const linkModalTitle = document.getElementById("linkModalTitle");
 const linkModalInput = document.getElementById("linkModalInput");
 const linkModalError = document.getElementById("linkModalError");
 const linkModalSubmit = document.getElementById("linkModalSubmit");
-let linkModalMode = null; // "song" or "playlist" - which action the shared modal is currently wired to
+let linkModalMode = null;
 
 const toggleSavedBtn = document.getElementById("toggleSavedBtn");
 const toggleQueueBtn = document.getElementById("toggleQueueBtn");
 const savedCountEl = document.getElementById("savedCount");
 const queueCountEl = document.getElementById("queueCount");
 
-// Mini Player (persistent now-playing widget, see app.js "Mini Player" section below)
 const toggleMiniBtn = document.getElementById("toggleMiniBtn");
 const miniPlayer = document.getElementById("miniPlayer");
 const miniAlbum = document.getElementById("miniAlbum");
@@ -80,25 +71,13 @@ const miniVolume = document.getElementById("miniVolume");
 let currentDuration = 0;
 let seeking = false;
 
-// Side panels start closed every time the menu is opened - they're
-// revealed with the Saved/Queue toggle buttons on the main head unit.
 let queuePanelOpen = false;
 let savedPanelOpen = false;
 
-// Whether the Mini Player widget is turned on FOR THE VEHICLE THE PLAYER IS
-// IN. The choice is saved per vehicle by client.lua (KVP, keyed by plate)
-// and pushed here with the "miniPlayerState" message whenever a vehicle is
-// entered, so one car can have it on while another has it off.
 let miniPlayerEnabled = false;
 
-// Whether the player is currently inside a vehicle - the Mini Player
-// should never show while on foot, even if it's turned on. Kept in sync
-// via the "vehicleState" NUI message from client.lua.
 let inVehicle = false;
 
-// ==============================
-// Helpers
-// ==============================
 function formatTime(seconds) {
     seconds = Math.max(0, Math.floor(seconds || 0));
     const m = Math.floor(seconds / 60);
@@ -110,13 +89,6 @@ function clamp(v, min, max) {
     return Math.min(max, Math.max(min, v));
 }
 
-// ==============================
-// Toast Notifications
-// ==============================
-// Confirmation ("success") or error feedback for actions like saving a
-// song, importing a playlist, starting the queue, etc. Called either
-// directly (for checks that never leave the client) or from the
-// "notify" NUI message the server relays a real result through.
 function showToast(message, type, duration) {
     if (!toastContainer || !message) return;
 
@@ -137,7 +109,7 @@ function showToast(message, type, duration) {
     toast.appendChild(text);
     toastContainer.appendChild(toast);
 
-    toast.offsetHeight; // force reflow so the enter transition actually runs
+    toast.offsetHeight;
     toast.classList.add("toast-visible");
 
     setTimeout(() => {
@@ -146,9 +118,6 @@ function showToast(message, type, duration) {
     }, duration || 3200);
 }
 
-// ==============================
-// NUI Listener
-// ==============================
 window.addEventListener("message", (e) => {
     const data = e.data;
 
@@ -158,21 +127,16 @@ window.addEventListener("message", (e) => {
             app.style.display = "flex";
             mainUI.style.display = "block";
 
-            // Main head unit is always visible; the side panels start
-            // closed and only open when their toggle button is pressed.
             closePanel("queue");
             closePanel("saved");
             syncPanelHeights();
 
-            // Force a reflow before adding the visibility class, so the
-            // browser actually has a "before" state to transition from
-            // instead of snapping straight to the open state.
             app.offsetHeight;
             app.classList.add("ui-visible");
 
             if (typeof data.maxVolume === "number") maxVolume = data.maxVolume;
             if (typeof data.volumeStep === "number") volumeStep = data.volumeStep;
-            updateMiniPlayerVisibility(); // main UI just opened - hide the Mini Player while it's up
+            updateMiniPlayerVisibility();
             break;
 
         case "hide":
@@ -181,12 +145,10 @@ window.addEventListener("message", (e) => {
             closePanel("queue");
             closePanel("saved");
             closeLinkModal();
-            updateMiniPlayerVisibility(); // main UI just closed - Mini Player can reappear now
+            updateMiniPlayerVisibility();
 
-            // Give the fade/scale-out transition time to finish before
-            // actually pulling the UI out of the layout.
             setTimeout(() => {
-                if (app.classList.contains("ui-visible")) return; // reopened mid-animation
+                if (app.classList.contains("ui-visible")) return;
                 app.style.display = "none";
                 mainUI.style.display = "none";
             }, UI_ANIM_MS);
@@ -288,7 +250,7 @@ window.addEventListener("message", (e) => {
             if (miniTimeCur) miniTimeCur.textContent = "0:00";
             if (miniTimeDur) miniTimeDur.textContent = "0:00";
             setMiniAlbumArt(null);
-            updateMiniPlayerVisibility(); // nothing playing - Mini Player hides itself
+            updateMiniPlayerVisibility();
             break;
 
         case "updateQueue":
@@ -327,15 +289,6 @@ function setVolumeDisplay(vol) {
     if (miniVolume) miniVolume.textContent = `${pct}%`;
 }
 
-// ==============================
-// Mini Player
-// ==============================
-// A small always-available now-playing widget, positioned above the
-// minimap. It mirrors the main head unit's song info (thumbnail, artist,
-// title, song length, current volume) but is shown/hidden independently
-// of #app, since its whole point is to still be visible once the main
-// CarPlay menu is closed. Toggled on/off with the "Mini" button on the
-// main head unit; the on/off choice is saved per vehicle by client.lua.
 function setMiniAlbumArt(url) {
     if (!miniAlbum || !miniArtPlaceholder) return;
     if (url) {
@@ -349,9 +302,6 @@ function setMiniAlbumArt(url) {
     }
 }
 
-// Tells client.lua whether the Mini Player is on, so it keeps sending
-// now-playing/progress/volume updates while the main menu is closed
-// (those are otherwise only sent while the main CarPlay UI is open).
 function syncMiniPlayerEnabledToClient() {
     fetch(`https://${GetParentResourceName()}/miniPlayerToggle`, {
         method: "POST",
@@ -360,9 +310,6 @@ function syncMiniPlayerEnabledToClient() {
     }).catch(() => {});
 }
 
-// Mini Player shows whenever it's turned on, song playing or not - it
-// only hides while the main head unit is open so the two don't overlap,
-// then reappears the moment the main UI closes.
 function updateMiniPlayerVisibility() {
     if (!miniPlayer) return;
     const mainOpen = app.classList.contains("ui-visible");
@@ -370,30 +317,22 @@ function updateMiniPlayerVisibility() {
     miniPlayer.classList.toggle("mini-visible", shouldShow);
 }
 
-// ==============================
-// Settings Menu (Mini Player position)
-// ==============================
-// Opened from the gear button under the volume rail. While open, the main
-// CarPlay UI is hidden (#app.settings-open) and the Mini Player is forced
-// visible so it can be nudged around with the +/- buttons. Save stores the
-// offset; closing the menu (X / Esc) brings the main UI back, and any
-// unsaved nudges are reverted to the last saved position.
 const MINI_POS_STORAGE_KEY = "x1s_carplay_miniPlayerPos";
-const MINI_POS_STEP = 5; // px per click
+const MINI_POS_STEP = 5;
 const settingsMenu = document.getElementById("settingsMenu");
 const posXVal = document.getElementById("posXVal");
 const posYVal = document.getElementById("posYVal");
 const settingsStatus = document.getElementById("settingsStatus");
 
 let settingsOpen = false;
-let settingsView = null; // null (closed) | "hub" | "accent" | "position"
-let savedMiniPos = { x: 0, y: 0 };   // last saved offset (x: + right, y: + up)
-let miniPos = { x: 0, y: 0 };        // current (possibly unsaved) offset
+let settingsView = null;
+let savedMiniPos = { x: 0, y: 0 };
+let miniPos = { x: 0, y: 0 };
 
 try {
     const raw = JSON.parse(localStorage.getItem(MINI_POS_STORAGE_KEY) || "null");
     if (raw && Number.isFinite(raw.x) && Number.isFinite(raw.y)) savedMiniPos = { x: raw.x, y: raw.y };
-} catch (e) { /* localStorage unavailable - default position */ }
+} catch (e) {  }
 miniPos = { ...savedMiniPos };
 
 function isSettingsOpen() { return settingsOpen; }
@@ -412,7 +351,6 @@ function applyMiniPos() {
     }
 }
 
-// Move one step on an axis, but never let the Mini Player leave the screen.
 function nudgeMini(axis, dir) {
     const prev = { ...miniPos };
     miniPos[axis] += dir * MINI_POS_STEP;
@@ -427,16 +365,9 @@ function nudgeMini(axis, dir) {
     applyMiniPos();
 }
 
-// ---- Views ----
-//   hub, accent -> shown INSIDE the player box (main UI stays up, everything
-//                  else greyed out, title reads "CarPlay Settings")
-//   position    -> hides the whole main UI so the Mini Player can be seen and
-//                  moved, in its own floating menu
 const SETTINGS_PANEL_VIEWS = { hub: "settingsHub", accent: "settingsAccent" };
 const SETTINGS_SUBTITLES = { hub: "Choose an option", accent: "Accent Color" };
 
-// Everything greyed out while the settings are open also gets `inert`, so
-// keyboard focus / Enter can't trigger it either (pointer-events is handled in CSS).
 const SETTINGS_DIMMED_SELECTORS = [
     ".topbar", ".panel-toggles", ".progress", ".time-row", ".controls",
     ".link-row", ".link-actions", "#linkError", ".bottom-actions",
@@ -449,7 +380,7 @@ function setMainUiInert(on) {
 }
 
 function renderSettingsView() {
-    const boxView = settingsView === "accent" ? "accent" : "hub"; // position view hides the box anyway
+    const boxView = settingsView === "accent" ? "accent" : "hub";
     for (const key in SETTINGS_PANEL_VIEWS) {
         const el = document.getElementById(SETTINGS_PANEL_VIEWS[key]);
         if (el) el.classList.toggle("settings-view-active", key === boxView);
@@ -462,19 +393,17 @@ function showSettingsView(name) {
     settingsView = name;
     const inPosition = name === "position";
     renderSettingsView();
-    app.classList.toggle("settings-open", inPosition);              // hides the whole main UI
-    settingsMenu.classList.toggle("settings-visible", inPosition);  // floating position menu
-    updateMiniPlayerVisibility();                                   // forces the Mini Player to show in that view
+    app.classList.toggle("settings-open", inPosition);
+    settingsMenu.classList.toggle("settings-visible", inPosition);
+    updateMiniPlayerVisibility();
 }
 
-// Discards unsaved position nudges and clears the status line.
 function resetPositionDraft() {
     miniPos = { ...savedMiniPos };
     if (settingsStatus) { settingsStatus.className = "settings-status"; settingsStatus.textContent = ""; }
     applyMiniPos();
 }
 
-// The gear button: opens the settings, press again to close them.
 function openSettings() {
     if (settingsOpen) { closeSettings(); return; }
     settingsOpen = true;
@@ -495,11 +424,10 @@ function openSettingsView(name) {
 }
 
 function backToSettingsHub() {
-    resetPositionDraft(); // leaving the position view without saving reverts it
+    resetPositionDraft();
     showSettingsView("hub");
 }
 
-// Esc: step back to the hub from a sub-view, close everything from the hub.
 function settingsEscape() {
     if (settingsView !== "hub") backToSettingsHub();
     else closeSettings();
@@ -509,7 +437,7 @@ function savePosition() {
     savedMiniPos = { ...miniPos };
     try {
         localStorage.setItem(MINI_POS_STORAGE_KEY, JSON.stringify(savedMiniPos));
-    } catch (e) { /* position just won't persist across restarts */ }
+    } catch (e) {  }
     if (settingsStatus) {
         settingsStatus.textContent = "Saved ✓";
         settingsStatus.className = "settings-status saved";
@@ -520,26 +448,16 @@ function closeSettings() {
     if (!settingsOpen) return;
     settingsOpen = false;
 
-    // Discard anything that wasn't saved.
     resetPositionDraft();
 
     settingsView = null;
-    app.classList.remove("settings-active", "settings-open"); // main UI is back to normal
+    app.classList.remove("settings-active", "settings-open");
     settingsMenu.classList.remove("settings-visible");
     setMainUiInert(false);
     renderSettingsView();
     updateMiniPlayerVisibility();
 }
 
-// ==============================
-// Streamer Mode
-// ==============================
-// Mutes every CarPlay sound for THIS player only (hooked into
-// SoundPlayer.setVolume in xsound/SoundPlayer.js). Playback itself keeps
-// running silently so the queue still advances for everyone else in the car.
-// client.lua is the source of truth (saved with KVP, also togglable with the
-// /streamermode command); localStorage just mirrors it so the mute is already
-// in place the instant the page loads.
 const STREAMER_STORAGE_KEY = "x1s_carplay_streamerMode";
 let streamerMode = false;
 try { streamerMode = localStorage.getItem(STREAMER_STORAGE_KEY) === "1"; } catch (e) {}
@@ -550,9 +468,7 @@ function applyStreamerMode(enabled) {
     window.X1S_StreamerMode = streamerMode;
     try { localStorage.setItem(STREAMER_STORAGE_KEY, streamerMode ? "1" : "0"); } catch (e) {}
 
-    // Re-apply volume on every live sound so it mutes / unmutes immediately.
     try {
-        // (soundList lives in xsound/listener.js; it may not exist yet at page load)
         for (const name in soundList) {
             try { const s = soundList[name]; if (s) s.setVolume(s.getVolume()); } catch (e) {}
         }
@@ -578,9 +494,6 @@ function toggleStreamerMode() {
     }).catch(() => {});
 }
 
-// ==============================
-// Accent Color
-// ==============================
 const ACCENT_STORAGE_KEY = "x1s_carplay_accent";
 const ACCENTS = {
     red:    { label: "Red",    main: "#ff3049", dim: "#7a1c26", glow: "rgba(255, 48, 73, 0.35)" },
@@ -597,7 +510,6 @@ try {
     if (saved && ACCENTS[saved]) currentAccent = saved;
 } catch (e) {}
 
-// Applies instantly (and is remembered) - no Save needed for this one.
 function applyAccent(key, persist) {
     const a = ACCENTS[key];
     if (!a) return;
@@ -638,8 +550,6 @@ function buildAccentGrid() {
 buildAccentGrid();
 applyAccent(currentAccent, false);
 
-// Click a number to type an exact value. Enter or clicking away applies it;
-// values that would push the Mini Player off-screen are clamped to the edge.
 function setMiniAxis(axis, value) {
     const r = miniPlayer.getBoundingClientRect();
     let min, max;
@@ -660,7 +570,7 @@ function setMiniAxis(axis, value) {
     const axis = input.dataset.axis;
     input.addEventListener("focus", () => input.select());
     input.addEventListener("keydown", (e) => {
-        e.stopPropagation(); // typing must not trigger Esc/close handling mid-edit
+        e.stopPropagation();
         if (e.key === "Enter") input.blur();
         if (e.key === "Escape") { input.value = miniPos[axis]; input.blur(); }
     });
@@ -671,7 +581,6 @@ function setMiniAxis(axis, value) {
     });
 });
 
-// Press-and-hold on +/- repeats the move.
 (function wirePosButtons() {
     let holdTimer = null, repeatTimer = null;
     const stop = () => { clearTimeout(holdTimer); clearInterval(repeatTimer); };
@@ -701,13 +610,6 @@ function toggleMiniPlayer() {
     updateMiniPlayerVisibility();
 }
 
-// ==============================
-// Side Panel Toggles (Saved / Queue)
-// ==============================
-// The main head unit is always on screen; the queue and saved-songs
-// panels are hidden until their toggle button is pressed, and both are
-// sized (in CSS) to line up next to the main UI - only their display
-// and the toggle button's active state change here.
 function openPanel(which) {
     const panel = which === "queue" ? queuePanel : savedPanel;
     const btn = which === "queue" ? toggleQueueBtn : toggleSavedBtn;
@@ -716,7 +618,7 @@ function openPanel(which) {
     else savedPanelOpen = true;
 
     panel.style.display = "flex";
-    panel.offsetHeight; // force reflow so the slide/fade-in actually transitions
+    panel.offsetHeight;
     panel.classList.add("panel-visible");
     btn.classList.add("active");
     btn.setAttribute("aria-pressed", "true");
@@ -734,7 +636,7 @@ function closePanel(which) {
     btn.setAttribute("aria-pressed", "false");
 
     setTimeout(() => {
-        if (panel.classList.contains("panel-visible")) return; // reopened mid-animation
+        if (panel.classList.contains("panel-visible")) return;
         panel.style.display = "none";
     }, UI_ANIM_MS);
 }
@@ -749,10 +651,6 @@ function toggleSavedPanel() {
     else openPanel("saved");
 }
 
-// ==============================
-// Keep the side panels exactly as tall as the main head unit, even as
-// its own height changes with content (album art, error text, etc.)
-// ==============================
 function syncPanelHeights() {
     const h = mainUI.offsetHeight;
     if (h > 0) {
@@ -765,9 +663,6 @@ if (typeof ResizeObserver !== "undefined") {
     new ResizeObserver(syncPanelHeights).observe(mainUI);
 }
 
-// ==============================
-// Play Song / Add To Queue
-// ==============================
 function playSong(song) {
     fetch(`https://${GetParentResourceName()}/play`, {
         method: "POST",
@@ -802,9 +697,6 @@ function startQueue() {
     fetch(`https://${GetParentResourceName()}/startQueue`, { method: "POST" });
 }
 
-// ==============================
-// Queue UI
-// ==============================
 function updateQueueUI() {
     if (!queueList) return;
 
@@ -855,9 +747,6 @@ function updateQueueUI() {
     });
 }
 
-// ==============================
-// Remove Song From Queue
-// ==============================
 function removeFromQueue(index) {
     window.queue.splice(index, 1);
     updateQueueUI();
@@ -872,7 +761,6 @@ function removeFromQueue(index) {
 function clearQueue() {
     if (window.queue.length === 0) return;
 
-    // remove from the end so index shifting doesn't skip anything
     while (window.queue.length > 0) {
         window.queue.pop();
         fetch(`https://${GetParentResourceName()}/remove`, {
@@ -885,9 +773,6 @@ function clearQueue() {
     showToast("Queue cleared.", "success");
 }
 
-// ==============================
-// Saved Songs (gallery view)
-// ==============================
 function updateSavedUI() {
     if (!savedList) return;
 
@@ -986,10 +871,6 @@ function removeSavedSong(index) {
     });
 }
 
-// ==============================
-// Shared Save Song / Import Playlist modal - one input+button, switched
-// between the two actions below depending on which button opened it.
-// ==============================
 function isLinkModalOpen() {
     return linkModalOverlay.classList.contains("open");
 }
@@ -1029,13 +910,6 @@ linkModalInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") submitLinkModal();
 });
 
-// ==============================
-// Link-type helpers - a playlist link is anything with a `list=` query
-// param but no specific video attached to it (a plain `watch?v=...&list=`
-// link is still just that one video, so it's fine either way; only a
-// bare `/playlist?list=...` link - or one with no video id at all - is
-// treated as playlist-only).
-// ==============================
 function isPlaylistOnlyLink(link) {
     try {
         const url = new URL(link);
@@ -1053,10 +927,6 @@ function isPlaylistOnlyLink(link) {
     }
 }
 
-// ==============================
-// Save a song straight from a YouTube link - doesn't touch playback
-// or the queue, just drops it into the saved list directly.
-// ==============================
 let savingByLink = false;
 
 function submitSavedLink() {
@@ -1112,10 +982,6 @@ function submitSavedLink() {
         });
 }
 
-// ==============================
-// Save an entire YouTube playlist to the saved list - the server
-// resolves the playlist's videos and reports back how many made it in.
-// ==============================
 let savingPlaylist = false;
 
 function submitPlaylistLink() {
@@ -1141,8 +1007,6 @@ function submitPlaylistLink() {
         body: JSON.stringify({ link })
     });
 
-    // Button/input get re-enabled once playlistImportResult comes back
-    // (or after a timeout, in case the request never returns).
     setTimeout(() => {
         if (savingPlaylist) resetPlaylistButton();
     }, 15000);
@@ -1176,9 +1040,6 @@ function handlePlaylistImportResult(data) {
     }
 }
 
-// ==============================
-// Play / Pause
-// ==============================
 function toggle() {
     if (!window.currentSong) return;
 
@@ -1190,9 +1051,6 @@ function toggle() {
     });
 }
 
-// ==============================
-// Submit Song (shared lookup, then either play immediately or queue)
-// ==============================
 function submitLink(mode) {
     if (submitting) return;
 
@@ -1257,9 +1115,6 @@ linkInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") submitPlay();
 });
 
-// ==============================
-// Volume (+ / - buttons)
-// ==============================
 function setVolume(vol) {
     vol = clamp(vol, 0, maxVolume);
     setVolumeDisplay(vol);
@@ -1274,9 +1129,6 @@ function setVolume(vol) {
 volUpBtn.addEventListener("click", () => setVolume(currentVolume + volumeStep));
 volDownBtn.addEventListener("click", () => setVolume(currentVolume - volumeStep));
 
-// ==============================
-// Close UI
-// ==============================
 function closeUI() {
     closeSettings();
     fetch(`https://${GetParentResourceName()}/close`, { method: "POST" });
@@ -1292,18 +1144,12 @@ function closeUI() {
     }, UI_ANIM_MS);
 }
 
-// ==============================
-// Skip Song (Manual)
-// ==============================
 function skip() {
     fetch(`https://${GetParentResourceName()}/skip`, {
         method: "POST"
     });
 }
 
-// ==============================
-// Restart Song (jump back to 0:00)
-// ==============================
 function restart() {
     if (!window.currentSong) return;
     previewSeek(0);
@@ -1311,8 +1157,6 @@ function restart() {
 }
 
 function updateSkipButton() {
-    // Skip only makes sense while the queue is actually running - otherwise
-    // there's nothing queued up to skip to.
     skipbtn.disabled = !window.currentSong || !window.queueActive;
     restartbtn.disabled = !window.currentSong;
     if (saveCurrentBtn) saveCurrentBtn.disabled = !window.currentSong;
@@ -1321,9 +1165,6 @@ function updateSkipButton() {
 
 setInterval(updateSkipButton, 500);
 
-// ==============================
-// Seek (click or drag anywhere on the progress bar)
-// ==============================
 function ratioFromEvent(e) {
     const rect = progressTrack.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -1375,7 +1216,6 @@ progressTrack.addEventListener("touchstart", startSeek, { passive: false });
 window.addEventListener("touchmove", moveSeek, { passive: false });
 window.addEventListener("touchend", endSeek);
 
-// ==============================
 updateQueueUI();
 updateSavedUI();
 setAlbumArt(null);
@@ -1388,7 +1228,6 @@ if (toggleMiniBtn) {
 applyMiniPos();
 updateMiniPlayerVisibility();
 
-// Ask client.lua for the saved Streamer Mode state (its KVP is the source of truth).
 applyStreamerMode(streamerMode);
 fetch(`https://${GetParentResourceName()}/streamerModeReady`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
     .then((r) => r.json())
