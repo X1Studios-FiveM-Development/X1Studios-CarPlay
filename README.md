@@ -1,4 +1,4 @@
-CarPlay v2.0.0 - X1Studios (SheriffX1)
+CarPlay v2.5.0 - X1Studios (SheriffX1)
 
 Command - "/carplay"
 Keybind - "9" -- Can be changed in "config.lua"
